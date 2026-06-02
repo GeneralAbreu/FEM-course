@@ -1315,7 +1315,7 @@ c
 c ======================================================================
 c ======================================================================
 c ======================================================================
-c IMPLEMENTACOES DO DISCENTE
+c IMPLEMENTACOES DO DISCENTE (CORREÇÃO DE SINTAXE VTK)
 c ======================================================================
 c ======================================================================
 c ======================================================================
@@ -1336,6 +1336,7 @@ c ======================================================================
       integer nel,ma,type
       integer n1,n2,n3
       integer k
+      integer i
 
       real*8 ux(3),uy(3)
 
@@ -1350,13 +1351,26 @@ c ======================================================================
       real*8 a,b,c
       real*8 d11,d12,d22,d33
 
-c-----------------------------------------------------------------------
-c     Tensoes por elemento (CELL_DATA)
-c-----------------------------------------------------------------------
+      real*8 sxel(numel)
+      real*8 syel(numel)
+      real*8 txyel(numel)
 
-      write(nvtk,'(a,i8)') 'CELL_DATA ', numel
-      write(nvtk,'(a)') 'TENSORS Stress float'
+      real*8 sxnod(nnode)
+      real*8 synod(nnode)
+      real*8 txynod(nnode)
 
+      integer nshare(nnode)
+
+c-----------------------------------------------------------------------
+c     Inicializacao dos vetores nodais
+c-----------------------------------------------------------------------
+      do i=1,nnode
+         sxnod(i)=0.d0
+         synod(i)=0.d0
+         txynod(i)=0.d0
+         nshare(i)=0
+      enddo
+      
       do 100 nel = 1,numel
 
         ma   = ix(nen+1,nel)
@@ -1366,12 +1380,9 @@ c       Apenas elementos T3
 
         if (type.lt.1 .or. type.gt.2) then
 
-          write(nvtk,'(3e16.8)')
-     .      0.d0,0.d0,0.d0
-          write(nvtk,'(3e16.8)')
-     .      0.d0,0.d0,0.d0
-          write(nvtk,'(3e16.8)')
-     .      0.d0,0.d0,0.d0
+          sxel(nel)  = 0.d0
+          syel(nel)  = 0.d0
+          txyel(nel) = 0.d0
 
           goto 100
         endif
@@ -1468,19 +1479,19 @@ c       Deformacoes
 c-----------------------------------------------------------------------
 
         epsx =
-     .      hx(1)*ux(1)
-     .    + hx(2)*ux(2)
-     .    + hx(3)*ux(3)
+     .       hx(1)*ux(1)
+     .     + hx(2)*ux(2)
+     .     + hx(3)*ux(3)
 
         epsy =
-     .      hy(1)*uy(1)
-     .    + hy(2)*uy(2)
-     .    + hy(3)*uy(3)
+     .       hy(1)*uy(1)
+     .     + hy(2)*uy(2)
+     .     + hy(3)*uy(3)
 
         gamxy =
-     .      hy(1)*ux(1) + hx(1)*uy(1)
-     .    + hy(2)*ux(2) + hx(2)*uy(2)
-     .    + hy(3)*ux(3) + hx(3)*uy(3)
+     .       hy(1)*ux(1) + hx(1)*uy(1)
+     .     + hy(2)*ux(2) + hx(2)*uy(2)
+     .     + hy(3)*ux(3) + hx(3)*uy(3)
 
 c-----------------------------------------------------------------------
 c       Matriz constitutiva
@@ -1519,8 +1530,8 @@ c-----------------------------------------------------------------------
 c       Tensoes
 c-----------------------------------------------------------------------
 
-        sx  = d12*epsx + d22*epsy
-        sy  = d11*epsx + d12*epsy
+        sx  = d11*epsx + d12*epsy
+        sy  = d12*epsx + d22*epsy
         txy = d33*gamxy
 
    90   continue
@@ -1529,16 +1540,76 @@ c-----------------------------------------------------------------------
 c       Tensor de tensoes
 c-----------------------------------------------------------------------
 
-        write(nvtk,'(3e16.8)')
-     .      sx,txy,0.d0
+        sxel(nel)  = sx
+        syel(nel)  = sy
+        txyel(nel) = txy
 
-        write(nvtk,'(3e16.8)')
-     .      txy,sy,0.d0
+c       Acumula as tensões nos nós do elemento
+        if (det.gt.0.d0) then
+          sxnod(n1)  = sxnod(n1)  + sx
+          synod(n1)  = synod(n1)  + sy
+          txynod(n1) = txynod(n1) + txy
+          nshare(n1) = nshare(n1) + 1
 
-        write(nvtk,'(3e16.8)')
-     .      0.d0,0.d0,0.d0
+          sxnod(n2)  = sxnod(n2)  + sx
+          synod(n2)  = synod(n2)  + sy
+          txynod(n2) = txynod(n2) + txy
+          nshare(n2) = nshare(n2) + 1
+
+          sxnod(n3)  = sxnod(n3)  + sx
+          synod(n3)  = synod(n3)  + sy
+          txynod(n3) = txynod(n3) + txy
+          nshare(n3) = nshare(n3) + 1
+        endif
 
   100 continue
+
+c     Calcula a média das tensões para cada nó
+      do i = 1, nnode
+        if (nshare(i) .gt. 0) then
+          sxnod(i)  = sxnod(i)  / dble(nshare(i))
+          synod(i)  = synod(i)  / dble(nshare(i))
+          txynod(i) = txynod(i) / dble(nshare(i))
+        endif
+      enddo
+
+c-----------------------------------------------------------------------
+c     Escrita direta dos campos escalares nodais
+c     (A linha POINT_DATA foi removida porque o bloco já foi aberto na wvtk)
+c-----------------------------------------------------------------------
+
+c-----------------------------------------------------------------------
+c     SX
+c-----------------------------------------------------------------------
+
+      write(nvtk,'(a)') 'SCALARS SX float 1'
+      write(nvtk,'(a)') 'LOOKUP_TABLE default'
+
+      do 200 i = 1, nnode
+        write(nvtk,'(e16.8)') sxnod(i)
+  200 continue
+
+c-----------------------------------------------------------------------
+c     SY
+c-----------------------------------------------------------------------
+
+      write(nvtk,'(a)') 'SCALARS SY float 1'
+      write(nvtk,'(a)') 'LOOKUP_TABLE default'
+
+      do 300 i = 1, nnode
+        write(nvtk,'(e16.8)') synod(i)
+  300 continue
+
+c-----------------------------------------------------------------------
+c     TXY
+c-----------------------------------------------------------------------
+
+      write(nvtk,'(a)') 'SCALARS TXY float 1'
+      write(nvtk,'(a)') 'LOOKUP_TABLE default'
+
+      do 400 i = 1, nnode
+        write(nvtk,'(e16.8)') txynod(i)
+  400 continue
 
       return
       end
