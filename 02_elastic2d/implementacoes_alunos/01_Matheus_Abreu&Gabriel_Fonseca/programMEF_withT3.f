@@ -7,6 +7,8 @@ c       2 - T3  Estado Plano de Tensoes    (EPT)
 c       3 - Q4  Estado Plano de Deformacoes (EPD)
 c       4 - Q4  Estado Plano de Tensoes    (EPT)
 c
+c     OBS: Tensoes apenas disponiveis para T3
+c
 c     Solver: Gradiente Conjugado Precondicionado (PCG)
 c             com precondicionador diagonal (Jacobi)
 c
@@ -177,12 +179,18 @@ c
       open(nvtk,file=fname,status='replace',action='write')
       call wvtk(m(i2),m(i3),a(i4),a(i5),a(i6),nnode,numel,ndm,nen,
      .          ndf,nvtk)
-      call vtkst3(a,m(i1),m(i2),m(i3),a(i4),a(i5),a(i6),
-     .      nnode,numel,nen,ndm,ndf,nvtk)
-      close(nvtk)
-      print*, 'Arquivo VTK gerado com sucesso.'
-      print*, 'Calculo concluido. Resultados gravados com sucesso.'
-      return
+
+c ============ INSERINDO IMPLEMENTACAO DO DISC ==========
+      print*, 'Arquivo VTK com deslocamentos gerado com sucesso.'
+
+      if (nen .eq. 3) then
+        call vtkst3(a,m(i1),m(i2),m(i3),a(i4),a(i5),a(i6),
+     .              nnode,numel,nen,ndm,ndf,nvtk)
+        close(nvtk)
+        print*, 'Adicao de tensoes no arquivo VTK efetuada com sucesso.'
+        return
+      endif
+
       end
 
 c ======================================================================
