@@ -1,3 +1,0 @@
-Ex1: Exemplo cedido pela professora
-
-Ex2: Retângulo em EPT c/ 1 de espessura, engastado na aresta superior e com força descendente de -1 na aresta inferior (tração "pura")
